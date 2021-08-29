@@ -147,6 +147,12 @@ where
         write!(f, "{}", s)
     }
 }
+impl<T> ::std::error::Error for ParseError<T>
+where
+    T: FromStr + Debug,
+    <T as FromStr>::Err: Debug + PartialEq + Eq,
+{
+}
 
 pub trait Num {}
 macro_rules! impl_num {
