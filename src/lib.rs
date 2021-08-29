@@ -10,7 +10,7 @@ enum Process {
     End,
 }
 
-pub fn parse<N>(src: String) -> (Bound<N>, Bound<N>)
+pub fn parse<N>(src: String) -> Result<(Bound<N>, Bound<N>), ParseError<N>>
 where
     N: Num + FromStr,
     <N as FromStr>::Err: Debug,
@@ -29,16 +29,16 @@ where
             '.' => {
                 status = match status {
                     Process::Before | Process::Start => Process::Notation,
-                    Process::Notation | Process::End => panic!("recognized multiple notation."),
+                    Process::Notation | Process::End => return Err(ParseError::MultiNotation),
                 };
 
                 index += 1;
                 match match src.chars().nth(index) {
-                    None => panic!("failed parse notation (index: {} | out of range)", index),
+                    None => return Err(ParseError::OutOfRange),
                     Some(c) => c,
                 } {
                     '.' => (),
-                    _ => panic!("failed parse notation (index: {})", index),
+                    c => return Err(ParseError::Unexpected { index, token: c }),
                 }
 
                 index += 1;
@@ -59,7 +59,7 @@ where
                     Process::Before => Process::Start,
                     Process::Notation => Process::End,
                     Process::Start | Process::End =>
-                        panic!("unexpected token: '{}' (index: {})", c0, index),
+                        return Err(ParseError::Unexpected { index, token: c0 }),
                 };
 
                 let mut tmp = String::new();
@@ -81,7 +81,7 @@ where
 
                 let num = match tmp.parse() {
                     Ok(o) => o,
-                    Err(e) => panic!("parsing error: {:?}", e),
+                    Err(e) => return Err(ParseError::NumParseErr(e)),
                 };
 
                 match (&status, is_exclude) {
@@ -95,22 +95,56 @@ where
 
                 is_exclude = None;
             },
-            _ => panic!("unexpected token: '{}' (index: {})", c0, index),
+            _ => return Err(ParseError::Unexpected { index, token: c0 }),
         }
 
         index += 1;
     }
 
     if let Some(false) = is_exclude {
-        panic!("`..=` notation must given end bounds.");
+        return Err(ParseError::WithoutIncludeEnds);
     }
 
     match status {
-        Process::Before | Process::Start => panic!("cannot recognized notation."),
+        Process::Before | Process::Start => return Err(ParseError::NoNotation),
         Process::Notation | Process::End => (),
     }
 
-    (start, end)
+    Ok((start, end))
+}
+
+pub enum ParseError<T>
+where
+    T: FromStr,
+    <T as FromStr>::Err: Debug,
+{
+    MultiNotation,
+    Unexpected { index: usize, token: char },
+    OutOfRange,
+    NumParseErr(<T as FromStr>::Err),
+    NoNotation,
+    WithoutIncludeEnds,
+}
+
+impl<T> ::core::fmt::Display for ParseError<T>
+where
+    T: FromStr,
+    <T as FromStr>::Err: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use ParseError::*;
+
+        let s = match self {
+            MultiNotation => "recognized multiple notation.".to_string(),
+            Unexpected { index, token } =>
+                format!("unexpected token: '{}' (index: {})", token, index),
+            OutOfRange => "out of range.".to_string(),
+            NumParseErr(e) => format!("parsing error: {:?}", e),
+            NoNotation => "`..=` notation must given end bounds.".to_string(),
+            WithoutIncludeEnds => "cannot recognized notation.".to_string(),
+        };
+        write!(f, "{}", s)
+    }
 }
 
 pub trait Num {}
