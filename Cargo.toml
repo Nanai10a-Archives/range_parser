@@ -1,6 +1,15 @@
 [package]
 name = "range_parser"
-version = "0.1.0"
+version = "0.1.0-alpha"
+authors = ["Nanai10a"]
 edition = "2018"
+description = "parser of rust's range notation."
 
-[dependencies]
+readme = "README.md"
+homepage = ""
+repository = "https://github.com/Nanai10a/range_parser"
+license-file = "LICENSE"
+
+keywords = []
+categories = []
+publish = false
