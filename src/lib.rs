@@ -10,6 +10,24 @@ enum Process {
     End,
 }
 
+/// parser of "range" notation like of rust's.
+///
+/// the following differences are acceptable:
+///
+/// - spaces before and after. (e.g. ` 0..=1  `)
+/// - spaces between `[num]` and *range token*. (e.g. `0 ..=  1`)
+///
+/// but, cannot use this notation: `[num][type]` (e.g. `8u32`)
+///
+/// assignable types to T:
+///
+/// - any unsigned integer types
+/// - any signed integer types
+///
+/// *note:*
+/// "Q. why cannot use *floating point number types*?"
+/// "A. because parse considering the decimal point is *troublesome* and
+/// unnecessary (not used that types in *that Project*. )."
 pub fn parse<N>(src: String) -> Result<(Bound<N>, Bound<N>), ParseError<N>>
 where
     N: Num + FromStr,
