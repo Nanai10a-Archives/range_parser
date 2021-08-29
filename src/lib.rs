@@ -13,7 +13,7 @@ enum Process {
 pub fn parse<N>(src: String) -> Result<(Bound<N>, Bound<N>), ParseError<N>>
 where
     N: Num + FromStr,
-    <N as FromStr>::Err: Debug,
+    <N as FromStr>::Err: Debug + PartialEq + Eq,
 {
     let mut status = Process::Before;
     let mut index = 0;
@@ -113,10 +113,11 @@ where
     Ok((start, end))
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum ParseError<T>
 where
     T: FromStr,
-    <T as FromStr>::Err: Debug,
+    <T as FromStr>::Err: Debug + PartialEq + Eq,
 {
     MultiNotation,
     Unexpected { index: usize, token: char },
@@ -129,7 +130,7 @@ where
 impl<T> ::core::fmt::Display for ParseError<T>
 where
     T: FromStr,
-    <T as FromStr>::Err: Debug,
+    <T as FromStr>::Err: Debug + PartialEq + Eq,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ParseError::*;
@@ -161,101 +162,182 @@ impl_num! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 }
 fn successfully_parse() {
     use Bound::*;
 
-    assert_eq!(parse::<u32>("..".to_string()), (Unbounded, Unbounded));
-    assert_eq!(parse::<u32>("0..".to_string()), (Included(0), Unbounded));
-    assert_eq!(parse::<u32>("..1".to_string()), (Unbounded, Excluded(1)));
-    assert_eq!(parse::<u32>("..=1".to_string()), (Unbounded, Included(1)));
-    assert_eq!(parse::<u32>("0..1".to_string()), (Included(0), Excluded(1)));
     assert_eq!(
-        parse::<u32>("0..=1".to_string()),
-        (Included(0), Included(1))
-    );
-
-    assert_eq!(
-        parse::<u32>("12345..67890".to_string()),
-        (Included(12345), Excluded(67890))
+        parse::<u32>("..".to_string()).unwrap(),
+        (Unbounded, Unbounded)
     );
     assert_eq!(
-        parse::<u32>("09876..=54321".to_string()),
-        (Included(9876), Included(54321))
-    );
-
-    assert_eq!(parse::<u32>("   ..   ".to_string()), (Unbounded, Unbounded));
-    assert_eq!(
-        parse::<u32>("   000   ..   ".to_string()),
+        parse::<u32>("0..".to_string()).unwrap(),
         (Included(0), Unbounded)
     );
     assert_eq!(
-        parse::<u32>("   ..   0001   ".to_string()),
+        parse::<u32>("..1".to_string()).unwrap(),
         (Unbounded, Excluded(1))
     );
     assert_eq!(
-        parse::<u32>("   ..=   0001   ".to_string()),
+        parse::<u32>("..=1".to_string()).unwrap(),
         (Unbounded, Included(1))
     );
     assert_eq!(
-        parse::<u32>("   000   ..   0001   ".to_string()),
+        parse::<u32>("0..1".to_string()).unwrap(),
         (Included(0), Excluded(1))
     );
     assert_eq!(
-        parse::<u32>("   000   ..=   0001   ".to_string()),
+        parse::<u32>("0..=1".to_string()).unwrap(),
         (Included(0), Included(1))
     );
 
     assert_eq!(
-        parse::<i32>("-12345..-67890".to_string()),
+        parse::<u32>("12345..67890".to_string()).unwrap(),
+        (Included(12345), Excluded(67890))
+    );
+    assert_eq!(
+        parse::<u32>("09876..=54321".to_string()).unwrap(),
+        (Included(9876), Included(54321))
+    );
+
+    assert_eq!(
+        parse::<u32>("   ..   ".to_string()).unwrap(),
+        (Unbounded, Unbounded)
+    );
+    assert_eq!(
+        parse::<u32>("   000   ..   ".to_string()).unwrap(),
+        (Included(0), Unbounded)
+    );
+    assert_eq!(
+        parse::<u32>("   ..   0001   ".to_string()).unwrap(),
+        (Unbounded, Excluded(1))
+    );
+    assert_eq!(
+        parse::<u32>("   ..=   0001   ".to_string()).unwrap(),
+        (Unbounded, Included(1))
+    );
+    assert_eq!(
+        parse::<u32>("   000   ..   0001   ".to_string()).unwrap(),
+        (Included(0), Excluded(1))
+    );
+    assert_eq!(
+        parse::<u32>("   000   ..=   0001   ".to_string()).unwrap(),
+        (Included(0), Included(1))
+    );
+
+    assert_eq!(
+        parse::<i32>("-12345..-67890".to_string()).unwrap(),
         (Included(-12345), Excluded(-67890))
     );
     assert_eq!(
-        parse::<i32>("-09876..=-54321".to_string()),
+        parse::<i32>("-09876..=-54321".to_string()).unwrap(),
         (Included(-9876), Included(-54321))
     );
 }
 
 #[test]
-#[should_panic(expected = "cannot recognized notation.")]
-fn cannot_recognized() { parse::<u32>("   ".to_string()); }
+fn cannot_recognized() {
+    assert_eq!(
+        parse::<u32>("   ".to_string()).unwrap_err(),
+        ParseError::NoNotation
+    );
+}
 
 #[test]
-#[should_panic(expected = "cannot recognized notation.")]
-fn no_notation() { parse::<u32>("   1   ".to_string()); }
+fn no_notation() {
+    assert_eq!(
+        parse::<u32>("   1   ".to_string()).unwrap_err(),
+        ParseError::NoNotation
+    );
+}
 
 #[test]
-#[should_panic(expected = "`..=` notation must given end bounds.")]
-fn include_notation_wituout_number() { parse::<u32>("   ..=   ".to_string()); }
+fn include_notation_wituout_number() {
+    assert_eq!(
+        parse::<u32>("   ..=   ".to_string()).unwrap_err(),
+        ParseError::WithoutIncludeEnds
+    );
+}
 
 #[test]
-#[should_panic(expected = "failed parse notation (index: 2)")]
-fn unexpected_notation() { parse::<u32>("0.1".to_string()); }
+fn unexpected_notation() {
+    assert_eq!(
+        parse::<u32>("0.1".to_string()).unwrap_err(),
+        ParseError::Unexpected {
+            index: 2,
+            token: '1'
+        }
+    );
+}
 
 #[test]
-#[should_panic(expected = "failed parse notation (index: 2 | out of range)")]
-fn shortage_notation() { parse::<u32>("0.".to_string()); }
+fn shortage_notation() {
+    assert_eq!(
+        parse::<u32>("0.".to_string()).unwrap_err(),
+        ParseError::OutOfRange
+    );
+}
 
 #[test]
-#[should_panic(expected = "unexpected token: 'a' (index: 0)")]
-fn unexpected_token_0() { parse::<u32>("a".to_string()); }
+fn unexpected_token_0() {
+    assert_eq!(
+        parse::<u32>("a".to_string()).unwrap_err(),
+        ParseError::Unexpected {
+            index: 0,
+            token: 'a'
+        }
+    );
+}
 
 #[test]
-#[should_panic(expected = "unexpected token: 'u' (index: 1)")]
-fn unexpected_token_1() { parse::<u32>("0u32..1".to_string()); }
+fn unexpected_token_1() {
+    assert_eq!(
+        parse::<u32>("0u32..1".to_string()).unwrap_err(),
+        ParseError::Unexpected {
+            index: 1,
+            token: 'u'
+        }
+    );
+}
 
 #[test]
-#[should_panic(expected = "recognized multiple notation.")]
-fn unexpected_token_2() { parse::<u32>("0...1".to_string()); }
+fn unexpected_token_2() {
+    assert_eq!(
+        parse::<u32>("0...1".to_string()).unwrap_err(),
+        ParseError::MultiNotation
+    );
+}
 
 #[test]
-#[should_panic(expected = "unexpected token: '1' (index: 2)")]
-fn unexpected_token_3() { parse::<u32>("0 1..2".to_string()); }
+fn unexpected_token_3() {
+    assert_eq!(
+        parse::<u32>("0 1..2".to_string()).unwrap_err(),
+        ParseError::Unexpected {
+            index: 2,
+            token: '1'
+        }
+    );
+}
 
 #[test]
-#[should_panic(expected = "unexpected token: '2' (index: 5)")]
-fn unexpected_token_4() { parse::<u32>("0..1 2".to_string()); }
+fn unexpected_token_4() {
+    assert_eq!(
+        parse::<u32>("0..1 2".to_string()).unwrap_err(),
+        ParseError::Unexpected {
+            index: 5,
+            token: '2'
+        }
+    );
+}
 
 #[test]
-#[should_panic]
-fn parsing_error() { parse::<i8>(format!("0..{}", (i16::MAX))); }
+fn parsing_error() {
+    match parse::<i8>(format!("0..{}", (i16::MAX))) {
+        Err(ParseError::NumParseErr(_)) => (),
+        _ => unreachable!(),
+    }
+}
 
 #[test]
-#[should_panic]
-fn parsing_unsigned_from_signed() { parse::<u32>("-1..-2".to_string()); }
+fn parsing_unsigned_from_signed() {
+    match parse::<u32>("-1..-2".to_string()) {
+        Err(ParseError::NumParseErr(_)) => (),
+        _ => unreachable!(),
+    }
+}
