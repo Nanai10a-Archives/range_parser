@@ -28,11 +28,14 @@ enum Process {
 /// "Q. why cannot use *floating point number types*?"
 /// "A. because parse considering the decimal point is *troublesome* and
 /// unnecessary (not used that types in *that Project*. )."
-pub fn parse<N>(src: String) -> Result<(Bound<N>, Bound<N>), ParseError<N>>
+pub fn parse<S, N>(src: S) -> Result<(Bound<N>, Bound<N>), ParseError<N>>
 where
+    S: ToString,
     N: Num + FromStr,
     <N as FromStr>::Err: Debug + PartialEq + Eq,
 {
+    let src = src.to_string();
+
     let mut status = Process::Before;
     let mut index = 0;
 
